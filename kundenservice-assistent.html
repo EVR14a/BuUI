@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kundenservice-Assistent</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --line: #d9dde3;
+    --line-strong: #b8bec7;
+    --soft: #f5f6f8;
+    --accent: #800000;
+    --accent-hover: #660000;
+    --accent-text: #ffffff;
+    --focus: #2f6fed;
+    --ok: #2e7d32;
+    --bad: #c62828;
+    --left-w: 280px;
+    --right-w: 320px;
+    --ease: cubic-bezier(.22, 1, .36, 1);
+  }
+  :root[data-theme="dark"] {
+    --bg: #121315;
+    --text: #e6e8eb;
+    --muted: #9aa1ab;
+    --line: #2c3036;
+    --line-strong: #4a5059;
+    --soft: #1b1d21;
+    --accent: #800000;
+    --accent-hover: #9a0000;
+    --accent-text: #ffffff;
+    --focus: #6d9cff;
+    --ok: #4caf50;
+    --bad: #ef5350;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    color: var(--text);
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  button, input, textarea { font: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap;
+  }
+  svg.ico { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 auto; }
+
+  /* Kopfzeile */
+  header {
+    height: 56px;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--line);
+  }
+  header h1 { font-size: 16px; font-weight: 600; margin: 0; }
+  .login { display: flex; align-items: center; gap: 12px; }
+  .user { color: var(--muted); font-size: 13px; white-space: nowrap; }
+  .btn {
+    height: 34px;
+    padding: 0 14px;
+    border: 1px solid var(--line-strong);
+    background: var(--bg);
+    color: var(--text);
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+  }
+  .btn:hover { background: var(--soft); border-color: var(--muted); }
+  .btn.primary, .btn.primary:hover {
+    background: var(--accent);
+    color: var(--accent-text);
+    border-color: var(--accent);
+  }
+  .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .btn.small { height: 28px; padding: 0 10px; font-size: 13px; }
+  .btn.ghost { border-color: transparent; background: transparent; }
+  .btn.ghost:hover { background: var(--soft); }
+
+  /* Drei Spalten, Seitenleisten einklappbar und verstellbar */
+  main {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: var(--left-col, var(--left-w)) 8px minmax(0, 1fr) 8px var(--right-col, var(--right-w));
+    transition: grid-template-columns .4s var(--ease);
+  }
+  main.dragging { transition: none; }
+  main.left-collapsed { --left-col: 0px; }
+  main.right-collapsed { --right-col: 0px; }
+
+  aside {
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    transition: opacity .3s ease, visibility .3s;
+  }
+  main.left-collapsed aside.left,
+  main.right-collapsed aside.right {
+    opacity: 0;
+    visibility: hidden;
+  }
+  .panel {
+    height: 100%;
+    overflow-y: auto;
+    padding: 20px;
+  }
+  aside.left .panel { width: var(--left-w); }
+  aside.right .panel { width: var(--right-w); }
+  aside h2 {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--muted);
+    margin: 0 0 12px;
+  }
+
+  /* Trenner zwischen den Spalten mit Ein-/Ausklappknopf */
+  .resizer {
+    position: relative;
+    cursor: col-resize;
+    touch-action: none;
+    outline-offset: -2px;
+  }
+  .resizer::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 1px;
+    background: var(--line);
+    transition: background-color .2s, width .2s;
+  }
+  .resizer:hover::after, .resizer.dragging::after, .resizer:focus-visible::after {
+    background: var(--accent);
+    width: 2px;
+    margin-left: -1px;
+  }
+  .grip {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid var(--line-strong);
+    border-radius: 50%;
+    background: var(--bg);
+    color: var(--muted);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+    cursor: pointer;
+  }
+  .grip svg { width: 14px; height: 14px; }
+  .grip:hover { color: var(--text); border-color: var(--muted); }
+
+  /* Vorlagen */
+  .tpl-form {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  .tpl-form input {
+    flex: 1;
+    min-width: 0;
+    height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--line-strong);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .tpl-form input::placeholder { color: var(--muted); }
+  .tpl-form input:focus { outline: none; border-color: var(--accent); }
+  .add-btn {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 6px;
+    background: var(--accent);
+    color: var(--accent-text);
+    cursor: pointer;
+  }
+  .add-btn:hover { background: var(--accent-hover); }
+  .add-btn:disabled { background: var(--line-strong); cursor: not-allowed; }
+  .questions { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+  .questions li { display: flex; align-items: stretch; gap: 6px; }
+  .questions .q-btn {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .questions .q-btn:hover { background: var(--soft); border-color: var(--line-strong); }
+  .del-btn {
+    width: 36px;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .del-btn:hover { color: var(--bad); border-color: var(--bad); background: var(--soft); }
+  .panel-foot { margin-top: 14px; display: flex; justify-content: flex-end; }
+  .muted-note { color: var(--muted); font-size: 13px; padding: 6px 2px; }
+
+  /* Checkliste mit grünem Haken und rotem X */
+  .checklist { list-style: none; padding: 0; margin: 0; }
+  .checklist li { border-bottom: 1px solid var(--line); }
+  .checklist li:first-child { border-top: 1px solid var(--line); }
+  .checklist label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 2px;
+    cursor: pointer;
+  }
+  .checklist input[type="checkbox"] {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 0 0 auto;
+    width: 22px;
+    height: 22px;
+    margin: 0;
+    border: none;
+    border-radius: 5px;
+    background-color: var(--bad);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M6 6l12 12M18 6L6 18'/%3E%3C/svg%3E");
+    background-size: 12px 12px;
+    background-position: center;
+    background-repeat: no-repeat;
+    cursor: pointer;
+  }
+  .checklist input[type="checkbox"]:checked {
+    background-color: var(--ok);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7'/%3E%3C/svg%3E");
+  }
+  .checklist input[type="checkbox"]:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .checklist input:checked + span { color: var(--muted); }
+  .aside-footer { margin-top: 14px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .progress { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+
+  /* Kundendashboard */
+  .dash { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line); }
+  .dash h2 { margin-bottom: 8px; }
+  .dash p { margin: 0 0 12px; color: var(--muted); line-height: 1.5; }
+
+  /* Chat */
+  .chat {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+  }
+  .callbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 24px;
+    border-bottom: 1px solid var(--line);
+    background: var(--soft);
+  }
+  .callbar .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex: 0 0 auto; }
+  .callbar .grow { flex: 1; }
+  .messages {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .msg {
+    max-width: 78%;
+    padding: 10px 14px;
+    border-radius: 12px;
+    line-height: 1.5;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+  }
+  .msg.bot {
+    align-self: flex-start;
+    background: var(--soft);
+    border: 1px solid var(--line);
+  }
+  .msg.user {
+    align-self: flex-end;
+    background: var(--accent);
+    color: var(--accent-text);
+  }
+  .msg .who {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .msg.user .who { color: rgba(255, 255, 255, .75); }
+  .msg-files { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+  .msg-files img {
+    display: block;
+    max-width: 220px;
+    max-height: 180px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+  }
+  .file-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--line-strong);
+    font-size: 13px;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .msg-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .empty {
+    margin: auto;
+    text-align: center;
+    color: var(--muted);
+    max-width: 360px;
+  }
+
+  /* Eingabebereich */
+  .composer {
+    flex: 0 0 auto;
+    border-top: 1px solid var(--line);
+    padding: 12px 24px 16px;
+  }
+  .attachments { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+  .attachments[hidden] { display: none; }
+  .chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 240px;
+    padding: 4px;
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    background: var(--soft);
+  }
+  .chip img { width: 36px; height: 36px; object-fit: cover; border-radius: 5px; flex: 0 0 auto; }
+  .chip .meta { min-width: 0; display: flex; flex-direction: column; }
+  .chip .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+  .chip .size { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .chip button {
+    margin-left: auto;
+    width: 26px;
+    height: 26px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    border-radius: 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+  }
+  .chip button:hover { background: var(--line); color: var(--text); }
+
+  .composer form {
+    display: flex;
+    gap: 6px;
+    align-items: flex-end;
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    padding: 6px;
+    background: var(--bg);
+  }
+  .composer form:focus-within { border-color: var(--accent); }
+  .composer textarea {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    resize: none;
+    min-height: 34px;
+    max-height: 140px;
+    padding: 8px 6px;
+    background: transparent;
+    color: var(--text);
+  }
+  .composer textarea::placeholder { color: var(--muted); }
+  .icon-btn {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .icon-btn:hover { background: var(--soft); color: var(--text); }
+  .icon-btn[aria-pressed="true"], .icon-btn.active {
+    background: var(--accent);
+    color: var(--accent-text);
+  }
+  .icon-btn.hangup, .icon-btn.hangup:hover {
+    background: var(--bad);
+    color: #ffffff;
+  }
+  .icon-btn.hangup svg { transform: rotate(135deg); }
+  .icon-btn:disabled { opacity: .4; cursor: not-allowed; }
+  .send {
+    height: 34px;
+    padding: 0 14px;
+    flex: 0 0 auto;
+    border: none;
+    border-radius: 6px;
+    background: var(--accent);
+    color: var(--accent-text);
+    cursor: pointer;
+  }
+  .send:hover { background: var(--accent-hover); }
+  .send:disabled { background: var(--line-strong); cursor: not-allowed; }
+  .hint { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+
+  /* Popups */
+  dialog {
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--bg);
+    color: var(--text);
+    width: min(780px, calc(100vw - 32px));
+    max-height: min(80vh, 720px);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, .25);
+  }
+  dialog[open] { display: flex; flex-direction: column; }
+  dialog::backdrop { background: rgba(10, 10, 10, .45); }
+  .dlg-head {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--line);
+  }
+  .dlg-head h2 { margin: 0; font-size: 16px; font-weight: 600; color: var(--text); text-transform: none; letter-spacing: 0; }
+  .dlg-body { flex: 1 1 auto; overflow: auto; padding: 8px 20px 12px; }
+  .dlg-note {
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 10px 20px 14px;
+    border-top: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .data { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .data th {
+    text-align: left;
+    font-weight: 600;
+    color: var(--muted);
+    font-size: 12px;
+    padding: 10px;
+    border-bottom: 1px solid var(--line-strong);
+    white-space: nowrap;
+  }
+  .data td {
+    padding: 10px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: middle;
+  }
+  .data .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .data tr.detail td { background: var(--soft); }
+  .dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 20px; margin: 0; }
+  .dl dt { color: var(--muted); }
+  .dl dd { margin: 0; font-variant-numeric: tabular-nums; }
+  .st-ok { color: var(--ok); font-weight: 600; }
+  .st-bad { color: var(--bad); font-weight: 600; }
+  .st-muted { color: var(--muted); font-weight: 600; }
+
+  /* Schmale Bildschirme */
+  @media (max-width: 1000px) {
+    body { overflow: auto; }
+    main { grid-template-columns: 1fr; height: auto; }
+    .resizer { display: none; }
+    aside { overflow: visible; }
+    aside.left { border-bottom: 1px solid var(--line); }
+    aside.right { border-top: 1px solid var(--line); }
+    main.left-collapsed aside.left, main.right-collapsed aside.right { opacity: 1; visibility: visible; }
+    .panel { height: auto; overflow: visible; }
+    aside.left .panel, aside.right .panel { width: auto; }
+    .chat { min-height: 480px; }
+    .msg { max-width: 92%; }
+  }
+
+  /* Bewegung: weich und leicht schwebend, nur wenn gewünscht */
+  @media (prefers-reduced-motion: no-preference) {
+    .btn, .add-btn, .send, .icon-btn, .questions .q-btn, .del-btn, .grip {
+      transition: background-color .2s ease, border-color .2s ease, color .2s ease, transform .25s var(--ease);
+    }
+    .btn:hover, .add-btn:hover, .send:hover { transform: translateY(-1px); }
+    .btn:active, .add-btn:active, .send:active, .icon-btn:active { transform: translateY(0) scale(.97); }
+    .questions .q-btn:hover { transform: translateX(3px); }
+    .questions .q-btn { transition: background-color .2s ease, border-color .2s ease, transform .3s var(--ease); }
+    .checklist input[type="checkbox"] { transition: background-color .25s ease, transform .25s var(--ease); }
+    .checklist input[type="checkbox"]:active { transform: scale(.9); }
+    .msg { animation: msgIn .4s var(--ease) both; }
+    .callbar { animation: slideDown .35s var(--ease) both; }
+    dialog[open] { animation: dlgIn .35s var(--ease) both; }
+    dialog[open]::backdrop { animation: fadeIn .3s ease both; }
+    .chip { animation: chipIn .3s var(--ease) both; }
+    .grip:hover { transform: translate(-50%, -50%) scale(1.08); }
+  }
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(10px) scale(.98); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes dlgIn {
+    from { opacity: 0; transform: translateY(14px) scale(.97); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes chipIn {
+    from { opacity: 0; transform: scale(.9); }
+    to { opacity: 1; transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Kundenservice-Assistent</h1>
+  <div class="login">
+    <button class="btn small" id="themeBtn" type="button" aria-pressed="false">Darkmode</button>
+    <span class="user" id="userLabel" hidden></span>
+    <button class="btn primary" id="loginBtn" type="button">Anmelden</button>
+  </div>
+</header>
+
+<main id="layout">
+  <!-- Links: vordefinierte Fragen und eigene Vorlagen -->
+  <aside class="left" aria-label="Vordefinierte Fragen">
+    <div class="panel">
+      <h2>Vordefinierte Fragen</h2>
+      <form class="tpl-form" id="tplForm">
+        <label for="tplInput" class="sr-only">Eigene Vorlage</label>
+        <input id="tplInput" type="text" placeholder="Eigene Vorlage" autocomplete="off">
+        <button class="add-btn" id="tplAdd" type="submit" aria-label="Vorlage hinzufügen" title="Vorlage hinzufügen">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </form>
+      <ul class="questions" id="questions"></ul>
+      <div class="panel-foot">
+        <button class="btn small ghost" id="tplReset" type="button">Vorlagen zurücksetzen</button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="resizer" id="resizeLeft" role="separator" aria-orientation="vertical"
+       aria-label="Breite der linken Leiste ändern" aria-valuemin="200" aria-valuemax="480" tabindex="0">
+    <button class="grip" id="toggleLeft" type="button" aria-expanded="true" aria-label="Linke Leiste ausblenden" title="Linke Leiste ausblenden"></button>
+  </div>
+
+  <!-- Mitte: Chat -->
+  <section class="chat" aria-label="Chat mit dem Assistenten">
+    <div class="callbar" id="callBar" hidden role="status" aria-live="polite">
+      <span class="dot" aria-hidden="true"></span>
+      <span id="callText">Verbunden mit dem Kunden</span>
+      <span class="grow"></span>
+      <span class="progress" id="callTime">00:00</span>
+    </div>
+
+    <div class="messages" id="messages" role="log" aria-live="polite">
+      <div class="empty" id="emptyState">
+        Wählen Sie links eine Frage aus oder schreiben Sie unten Ihre Anfrage.
+      </div>
+    </div>
+
+    <div class="composer">
+      <div class="attachments" id="attachments" hidden></div>
+      <form id="chatForm">
+        <button class="icon-btn" id="attachBtn" type="button" aria-label="Datei oder Bild anhängen" title="Datei oder Bild anhängen">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+        <input type="file" id="fileInput" multiple hidden
+               accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt">
+        <label for="chatInput" class="sr-only">Nachricht eingeben</label>
+        <textarea id="chatInput" rows="1" placeholder="Nachricht eingeben …"></textarea>
+        <button class="icon-btn" id="voiceBtn" type="button" aria-pressed="false" aria-label="Spracheingabe" title="Spracheingabe">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>
+        </button>
+        <button class="icon-btn" id="callBtn" type="button" aria-label="Anruf annehmen" title="Anruf annehmen">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg>
+        </button>
+        <button class="send" id="sendBtn" type="submit" disabled>Senden</button>
+      </form>
+      <p class="hint">Enter zum Senden, Umschalt + Enter für eine neue Zeile.</p>
+    </div>
+  </section>
+
+  <div class="resizer" id="resizeRight" role="separator" aria-orientation="vertical"
+       aria-label="Breite der rechten Leiste ändern" aria-valuemin="200" aria-valuemax="480" tabindex="0">
+    <button class="grip" id="toggleRight" type="button" aria-expanded="true" aria-label="Rechte Leiste ausblenden" title="Rechte Leiste ausblenden"></button>
+  </div>
+
+  <!-- Rechts: Kundendaten und Dashboard -->
+  <aside class="right" aria-label="Kundendaten">
+    <div class="panel">
+      <h2>Kundendaten</h2>
+      <ul class="checklist" id="checklist"></ul>
+      <div class="aside-footer">
+        <span class="progress" id="progress">0 von 7 erfasst</span>
+        <button class="btn small" id="resetBtn" type="button">Zurücksetzen</button>
+      </div>
+
+      <section class="dash" aria-labelledby="dashTitle">
+        <h2 id="dashTitle">Kundendashboard</h2>
+        <p>Kontostand, Rechnungen, Tarif und Vertragsdaten des Kunden in der Gesamtübersicht.</p>
+        <a class="btn primary" id="dashLink" href="#" target="_blank" rel="noopener noreferrer">Kundendashboard öffnen</a>
+      </section>
+    </div>
+  </aside>
+</main>
+
+<!-- Popup für Listen mit Details -->
+<dialog id="dataDialog" aria-labelledby="dlgTitle">
+  <div class="dlg-head">
+    <h2 id="dlgTitle"></h2>
+    <button class="icon-btn" id="dlgClose" type="button" aria-label="Schließen" title="Schließen">
+      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <div class="dlg-body" id="dlgBody"></div>
+  <p class="dlg-note" id="dlgNote"></p>
+</dialog>
+
+<script>
+  // Adresse des Kundendashboards hier eintragen
+  const CUSTOMER_DASHBOARD_URL = "https://example.com/kundendashboard";
+
+  const DEFAULT_TEMPLATES = [
+    "Anlegen eines Neukunden",
+    "Kunde hat Fragen zur Rechnung",
+    "Kunde möchte eine Korrektur",
+    "Kunde will seine Rechnungshistorie",
+    "Kunde zieht aus",
+    "Kunde braucht eine Fahrkarte",
+    "Suche was wir zu Kunde XYZ wissen"
+  ];
+
+  const fields = ["Vorname", "Nachname", "Geburtstag", "Adresse", "Bankdaten", "Tarif", "Zustimmung"];
+
+  const botReplies = {
+    "Anlegen eines Neukunden":
+      "Ich lege einen Neukunden an. Bitte nennen Sie mir der Reihe nach:\n1. Vorname und Nachname\n2. Geburtstag\n3. Adresse\n4. Bankdaten\n5. Gewählter Tarif\n6. Zustimmung des Kunden\n\nDie Felder rechts helfen Ihnen, den Überblick zu behalten.",
+    "Kunde hat Fragen zur Rechnung":
+      "Gerne. Bitte nennen Sie mir die Kundennummer und die Rechnungsnummer oder den Zeitraum. Hier sehen Sie die Rechnungen im Überblick.",
+    "Kunde möchte eine Korrektur":
+      "Welche Angabe soll korrigiert werden? Bitte nennen Sie das Feld (z. B. Adresse oder Bankdaten) und den neuen Wert. Die Änderung wird danach dokumentiert.",
+    "Kunde will seine Rechnungshistorie":
+      "Ich stelle die Rechnungshistorie zusammen. Die Rechnungen des Kunden finden Sie hier:",
+    "Kunde zieht aus":
+      "Für den Umzug prüfe ich die Zählerstände. Die letzten Ablesungen finden Sie hier:",
+    "Kunde braucht eine Fahrkarte":
+      "Ich unterstütze Sie bei der Fahrkarte. Bitte nennen Sie Start, Ziel, Reisedatum und die gewünschte Klasse oder den Tarif.",
+    "Suche was wir zu Kunde XYZ wissen":
+      "Ich suche Informationen zu Kunde XYZ. Bitte bestätigen Sie die Kundennummer oder nennen Sie den vollständigen Namen, damit ich nichts verwechsle."
+  };
+
+  const defaultReply =
+    "Danke für Ihre Nachricht. Ich habe sie notiert. Bitte geben Sie bei Bedarf weitere Details an, z. B. Kundennummer oder Zeitraum.";
+
+  // Beispieldaten für die Popups
+  const invoices = [
+    { nr: "RE-2025-0412", date: "03.04.2025", period: "Januar bis März 2025", amount: 89.90, status: "Bezahlt", pay: "Lastschrift",
+      positions: [["Grundgebühr Tarif Komfort", 59.90], ["Zusatzpaket Streaming", 15.00], ["Einmalige Bereitstellung", 15.00]] },
+    { nr: "RE-2025-0311", date: "03.03.2025", period: "Februar 2025", amount: 74.90, status: "Bezahlt", pay: "Lastschrift",
+      positions: [["Grundgebühr Tarif Komfort", 59.90], ["Zusatzpaket Streaming", 15.00]] },
+    { nr: "RE-2025-0211", date: "03.02.2025", period: "Januar 2025", amount: 74.90, status: "Bezahlt", pay: "Lastschrift",
+      positions: [["Grundgebühr Tarif Komfort", 59.90], ["Zusatzpaket Streaming", 15.00]] },
+    { nr: "RE-2024-1213", date: "03.01.2025", period: "Dezember 2024", amount: 84.90, status: "Überfällig", pay: "Überweisung",
+      positions: [["Grundgebühr Tarif Komfort", 59.90], ["Zusatzpaket Streaming", 15.00], ["Rufnummernmitnahme", 10.00]] }
+  ];
+
+  const meters = [
+    { type: "Strom", nr: "DE0012345678", date: "15.03.2025", reading: "48.215 kWh", usage: "412 kWh", prev: "47.803 kWh", method: "Kunde", place: "Keller", calib: "2031" },
+    { type: "Gas", nr: "G-884201", date: "15.03.2025", reading: "11.742 m³", usage: "1.034 m³", prev: "10.708 m³", method: "Techniker", place: "Hausanschluss", calib: "2030" },
+    { type: "Wasser", nr: "W-220931", date: "01.02.2025", reading: "312 m³", usage: "38 m³", prev: "274 m³", method: "Kunde", place: "Außenbereich", calib: "2034" }
+  ];
+
+  const botActions = {
+    "Kunde hat Fragen zur Rechnung": [{ label: "Rechnungen anzeigen", run: () => openInvoices() }],
+    "Kunde will seine Rechnungshistorie": [{ label: "Rechnungshistorie anzeigen", run: () => openInvoices() }],
+    "Kunde zieht aus": [{ label: "Zählerstände anzeigen", run: () => openMeters() }]
+  };
+
+  const TRASH = '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>';
+  const ARROW_LEFT = '<path d="M15 18l-6-6 6-6"/>';
+  const ARROW_RIGHT = '<path d="M9 18l6-6-6-6"/>';
+
+  const root = document.documentElement;
+  const layout = document.getElementById("layout");
+  const messagesEl = document.getElementById("messages");
+  const emptyEl = document.getElementById("emptyState");
+  const inputEl = document.getElementById("chatInput");
+  const sendBtn = document.getElementById("sendBtn");
+  const formEl = document.getElementById("chatForm");
+  const loginBtn = document.getElementById("loginBtn");
+  const userLabel = document.getElementById("userLabel");
+  const checklistEl = document.getElementById("checklist");
+  const progressEl = document.getElementById("progress");
+  const resetBtn = document.getElementById("resetBtn");
+  const themeBtn = document.getElementById("themeBtn");
+  const attachBtn = document.getElementById("attachBtn");
+  const fileInput = document.getElementById("fileInput");
+  const attachmentsEl = document.getElementById("attachments");
+  const voiceBtn = document.getElementById("voiceBtn");
+  const callBtn = document.getElementById("callBtn");
+  const callBar = document.getElementById("callBar");
+  const callText = document.getElementById("callText");
+  const callTime = document.getElementById("callTime");
+  const dashLink = document.getElementById("dashLink");
+  const questionsEl = document.getElementById("questions");
+  const tplForm = document.getElementById("tplForm");
+  const tplInput = document.getElementById("tplInput");
+  const tplReset = document.getElementById("tplReset");
+  const dlg = document.getElementById("dataDialog");
+  const dlgTitle = document.getElementById("dlgTitle");
+  const dlgBody = document.getElementById("dlgBody");
+  const dlgNote = document.getElementById("dlgNote");
+  const dlgClose = document.getElementById("dlgClose");
+
+  dashLink.href = CUSTOMER_DASHBOARD_URL;
+
+  // Hilfsfunktionen
+  function el(tag, props = {}, children = []) {
+    const node = document.createElement(tag);
+    Object.entries(props).forEach(([key, value]) => {
+      if (key === "class") node.className = value;
+      else if (key === "text") node.textContent = value;
+      else node.setAttribute(key, value);
+    });
+    children.forEach((c) => node.append(c));
+    return node;
+  }
+
+  function svgIcon(inner) {
+    return `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">${inner}</svg>`;
+  }
+
+  function fmtEUR(n) {
+    return n.toLocaleString("de-DE", { style: "currency", currency: "EUR" });
+  }
+
+  function formatSize(bytes) {
+    if (bytes < 1024 * 1024) return Math.max(1, Math.round(bytes / 1024)) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  }
+
+  // Vorlagen (links)
+  let templates = [...DEFAULT_TEMPLATES];
+
+  function renderTemplates() {
+    questionsEl.replaceChildren();
+    templates.forEach((q, i) => {
+      const btn = el("button", { class: "q-btn", type: "button", text: q });
+      btn.addEventListener("click", () => ask(q));
+      const del = el("button", {
+        class: "del-btn",
+        type: "button",
+        "aria-label": "Vorlage löschen: " + q,
+        title: "Vorlage löschen"
+      });
+      del.innerHTML = svgIcon(TRASH);
+      del.addEventListener("click", () => {
+        templates.splice(i, 1);
+        renderTemplates();
+      });
+      questionsEl.append(el("li", {}, [btn, del]));
+    });
+    if (!templates.length) {
+      questionsEl.append(el("li", { class: "muted-note", text: "Keine Vorlagen vorhanden." }));
+    }
+  }
+
+  tplForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const value = tplInput.value.trim();
+    if (!value) return;
+    templates.push(value);
+    tplInput.value = "";
+    renderTemplates();
+    tplInput.focus();
+  });
+
+  tplReset.addEventListener("click", () => {
+    templates = [...DEFAULT_TEMPLATES];
+    renderTemplates();
+  });
+
+  renderTemplates();
+
+  // Checkliste Kundendaten
+  fields.forEach((name, i) => {
+    const li = document.createElement("li");
+    const label = document.createElement("label");
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.id = "field-" + i;
+    cb.addEventListener("change", updateProgress);
+    const span = document.createElement("span");
+    span.textContent = name;
+    label.htmlFor = cb.id;
+    label.append(cb, span);
+    li.appendChild(label);
+    checklistEl.appendChild(li);
+  });
+
+  function updateProgress() {
+    const boxes = checklistEl.querySelectorAll("input[type=checkbox]");
+    const done = [...boxes].filter((b) => b.checked).length;
+    progressEl.textContent = `${done} von ${boxes.length} erfasst`;
+  }
+
+  resetBtn.addEventListener("click", () => {
+    checklistEl.querySelectorAll("input[type=checkbox]").forEach((b) => (b.checked = false));
+    updateProgress();
+  });
+
+  // Darkmode: standardmäßig wie das System, umschaltbar
+  let darkMode = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  function applyTheme() {
+    root.setAttribute("data-theme", darkMode ? "dark" : "light");
+    themeBtn.textContent = darkMode ? "Hellmodus" : "Darkmode";
+    themeBtn.setAttribute("aria-pressed", String(darkMode));
+  }
+  themeBtn.addEventListener("click", () => {
+    darkMode = !darkMode;
+    applyTheme();
+  });
+  applyTheme();
+
+  // Anmeldung (nur Oberfläche, keine echte Authentifizierung)
+  let loggedIn = false;
+  loginBtn.addEventListener("click", () => {
+    loggedIn = !loggedIn;
+    loginBtn.textContent = loggedIn ? "Abmelden" : "Anmelden";
+    loginBtn.classList.toggle("primary", !loggedIn);
+    userLabel.hidden = !loggedIn;
+    userLabel.textContent = loggedIn ? "Angemeldet als Benutzer" : "";
+  });
+
+  // Seitenleisten: Breite ziehen und ein-/ausklappen
+  const LIMITS = { min: 200, max: 480 };
+  const widths = { left: 280, right: 320 };
+  const handles = {
+    left: document.getElementById("resizeLeft"),
+    right: document.getElementById("resizeRight")
+  };
+  const toggles = {
+    left: document.getElementById("toggleLeft"),
+    right: document.getElementById("toggleRight")
+  };
+
+  function setWidth(side, value) {
+    const w = Math.round(Math.min(LIMITS.max, Math.max(LIMITS.min, value)));
+    widths[side] = w;
+    root.style.setProperty(side === "left" ? "--left-w" : "--right-w", w + "px");
+    handles[side].setAttribute("aria-valuenow", String(w));
+  }
+
+  function toggleSide(side) {
+    const collapsed = layout.classList.toggle(side + "-collapsed");
+    const btn = toggles[side];
+    const label = side === "left" ? "Linke Leiste" : "Rechte Leiste";
+    const pointsLeft = (side === "left") !== collapsed;
+    btn.setAttribute("aria-expanded", String(!collapsed));
+    btn.setAttribute("aria-label", `${label} ${collapsed ? "einblenden" : "ausblenden"}`);
+    btn.title = `${label} ${collapsed ? "einblenden" : "ausblenden"}`;
+    btn.innerHTML = svgIcon(pointsLeft ? ARROW_LEFT : ARROW_RIGHT);
+    btn.querySelector("svg").style.width = "14px";
+    btn.querySelector("svg").style.height = "14px";
+  }
+
+  ["left", "right"].forEach((side) => {
+    const handle = handles[side];
+    setWidth(side, widths[side]);
+    toggles[side].innerHTML = svgIcon(side === "left" ? ARROW_LEFT : ARROW_RIGHT);
+    toggles[side].querySelector("svg").style.width = "14px";
+    toggles[side].querySelector("svg").style.height = "14px";
+    toggles[side].addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleSide(side);
+    });
+
+    handle.addEventListener("pointerdown", (e) => {
+      if (e.target.closest(".grip")) return;
+      e.preventDefault();
+      handle.setPointerCapture(e.pointerId);
+      handle.classList.add("dragging");
+      layout.classList.add("dragging");
+      const startX = e.clientX;
+      const startW = widths[side];
+      const onMove = (ev) => {
+        const dx = ev.clientX - startX;
+        setWidth(side, side === "left" ? startW + dx : startW - dx);
+      };
+      const onUp = () => {
+        handle.classList.remove("dragging");
+        layout.classList.remove("dragging");
+        handle.removeEventListener("pointermove", onMove);
+        handle.removeEventListener("pointerup", onUp);
+        handle.removeEventListener("pointercancel", onUp);
+      };
+      handle.addEventListener("pointermove", onMove);
+      handle.addEventListener("pointerup", onUp);
+      handle.addEventListener("pointercancel", onUp);
+    });
+
+    handle.addEventListener("keydown", (e) => {
+      const step = e.shiftKey ? 40 : 16;
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.preventDefault();
+        const delta = e.key === "ArrowRight" ? step : -step;
+        setWidth(side, side === "left" ? widths[side] + delta : widths[side] - delta);
+      }
+    });
+  });
+
+  // Popups
+  function openDialog(title, content, note) {
+    dlgTitle.textContent = title;
+    dlgBody.replaceChildren(content);
+    dlgNote.textContent = note;
+    dlg.showModal();
+  }
+
+  dlgClose.addEventListener("click", () => dlg.close());
+  dlg.addEventListener("click", (e) => {
+    if (e.target === dlg) dlg.close();
+  });
+
+  // Tabelle mit ausklappbaren Details
+  function buildTable(columns, items) {
+    const thead = el("thead", {}, [
+      el("tr", {}, [
+        ...columns.map((c) => el("th", { class: c.num ? "num" : "", text: c.label })),
+        el("th", { class: "num", text: "" })
+      ])
+    ]);
+    const tbody = el("tbody");
+    items.forEach((item) => {
+      const cells = item.cells.map((cell, i) => {
+        const td = el("td", { class: columns[i].num ? "num" : "" });
+        if (cell instanceof Node) td.append(cell);
+        else td.textContent = cell;
+        return td;
+      });
+      const toggle = el("button", { class: "btn small ghost", type: "button", "aria-expanded": "false", text: "Details" });
+      cells.push(el("td", { class: "num" }, [toggle]));
+      const row = el("tr", {}, cells);
+
+      const dl = el("dl", { class: "dl" });
+      item.details.forEach(([k, v]) => dl.append(el("dt", { text: k }), el("dd", { text: v })));
+      const detailRow = el("tr", { class: "detail", hidden: "" }, [
+        el("td", { colspan: String(columns.length + 1) }, [dl])
+      ]);
+
+      toggle.addEventListener("click", () => {
+        const opening = detailRow.hidden;
+        detailRow.hidden = !opening;
+        toggle.setAttribute("aria-expanded", String(opening));
+        toggle.textContent = opening ? "Schließen" : "Details";
+      });
+
+      tbody.append(row, detailRow);
+    });
+    const table = el("table", { class: "data" }, [thead, tbody]);
+    return el("div", { class: "tablewrap" }, [table]);
+  }
+
+  function statusNode(status) {
+    const cls = status === "Bezahlt" ? "st-ok" : status === "Überfällig" ? "st-bad" : "st-muted";
+    return el("span", { class: cls, text: status });
+  }
+
+  function openInvoices() {
+    const items = invoices.map((inv) => ({
+      cells: [inv.nr, inv.date, inv.period, fmtEUR(inv.amount), statusNode(inv.status)],
+      details: [
+        ...inv.positions.map(([label, amount]) => [label, fmtEUR(amount)]),
+        ["Gesamtbetrag", fmtEUR(inv.amount)],
+        ["Zahlungsart", inv.pay]
+      ]
+    }));
+    const columns = [
+      { label: "Rechnung" },
+      { label: "Datum" },
+      { label: "Zeitraum" },
+      { label: "Betrag", num: true },
+      { label: "Status" }
+    ];
+    openDialog("Rechnungshistorie", buildTable(columns, items), "Beispieldaten zur Darstellung, keine echten Kundendaten.");
+  }
+
+  function openMeters() {
+    const items = meters.map((m) => ({
+      cells: [m.type, m.nr, m.date, m.reading, m.usage],
+      details: [
+        ["Vorheriger Stand", m.prev],
+        ["Ablesung durch", m.method],
+        ["Zählerort", m.place],
+        ["Eichung gültig bis", m.calib]
+      ]
+    }));
+    const columns = [
+      { label: "Zähler" },
+      { label: "Zählernummer" },
+      { label: "Ablesedatum" },
+      { label: "Stand", num: true },
+      { label: "Verbrauch", num: true }
+    ];
+    openDialog("Zählerstände", buildTable(columns, items), "Beispieldaten zur Darstellung, keine echten Kundendaten.");
+  }
+
+  // Dateien im Chat
+  function addMessage(role, text, files = [], actions = []) {
+    if (emptyEl && emptyEl.parentNode) emptyEl.remove();
+    const div = el("div", { class: "msg " + role });
+    div.append(el("span", { class: "who", text: role === "user" ? "Sie" : "Assistent" }));
+
+    if (files.length) {
+      const wrap = el("div", { class: "msg-files" });
+      files.forEach((f) => {
+        if (f.url) {
+          wrap.append(el("img", { src: f.url, alt: f.file.name }));
+        } else {
+          wrap.append(el("span", { class: "file-tag", text: f.file.name + " (" + formatSize(f.file.size) + ")" }));
+        }
+      });
+      div.append(wrap);
+    }
+    if (text) div.append(document.createTextNode(text));
+
+    if (actions.length) {
+      const row = el("div", { class: "msg-actions" });
+      actions.forEach((a) => {
+        const b = el("button", { class: "btn small", type: "button", text: a.label });
+        b.addEventListener("click", a.run);
+        row.append(b);
+      });
+      div.append(row);
+    }
+
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function respond(text, files) {
+    if (files.length) {
+      const n = files.length;
+      const reply = `Ich habe ${n} ${n === 1 ? "Datei" : "Dateien"} erhalten. Bitte sagen Sie mir, wozu ${n === 1 ? "sie gehört" : "sie gehören"}, z. B. Vertrag, Rechnung oder Ausweis.`;
+      setTimeout(() => addMessage("bot", reply), 400);
+      return;
+    }
+    const reply = botReplies[text] || defaultReply;
+    const actions = botActions[text] || [];
+    setTimeout(() => addMessage("bot", reply, [], actions), 400);
+  }
+
+  function ask(question) {
+    addMessage("user", question);
+    respond(question, []);
+  }
+
+  // Anhänge
+  let pending = [];
+
+  function renderAttachments() {
+    attachmentsEl.replaceChildren();
+    attachmentsEl.hidden = pending.length === 0;
+    pending.forEach((item, index) => {
+      const chip = el("div", { class: "chip" });
+      if (item.url) chip.append(el("img", { src: item.url, alt: "" }));
+      const meta = el("div", { class: "meta" }, [
+        el("span", { class: "name", title: item.file.name, text: item.file.name }),
+        el("span", { class: "size", text: formatSize(item.file.size) })
+      ]);
+      const remove = el("button", {
+        type: "button",
+        "aria-label": "Anhang entfernen: " + item.file.name,
+        title: "Entfernen"
+      });
+      remove.innerHTML = `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
+      remove.addEventListener("click", () => {
+        if (item.url) URL.revokeObjectURL(item.url);
+        pending.splice(index, 1);
+        renderAttachments();
+      });
+      chip.append(meta, remove);
+      attachmentsEl.append(chip);
+    });
+    updateSend();
+  }
+
+  attachBtn.addEventListener("click", () => fileInput.click());
+
+  fileInput.addEventListener("change", () => {
+    [...fileInput.files].forEach((file) => {
+      pending.push({
+        file,
+        url: file.type.startsWith("image/") ? URL.createObjectURL(file) : null
+      });
+    });
+    fileInput.value = "";
+    renderAttachments();
+  });
+
+  // Spracheingabe (Browser-Funktion, z. B. Chrome und Edge)
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recognition = null;
+  let recording = false;
+
+  function setVoiceState(on) {
+    recording = on;
+    voiceBtn.setAttribute("aria-pressed", String(on));
+    voiceBtn.setAttribute("aria-label", on ? "Spracheingabe beenden" : "Spracheingabe");
+    voiceBtn.title = on ? "Spracheingabe beenden" : "Spracheingabe";
+  }
+
+  if (!SpeechRec) {
+    voiceBtn.disabled = true;
+    voiceBtn.title = "Spracheingabe wird von diesem Browser nicht unterstützt";
+  }
+
+  voiceBtn.addEventListener("click", () => {
+    if (recording && recognition) {
+      recognition.stop();
+      return;
+    }
+    recognition = new SpeechRec();
+    recognition.lang = "de-DE";
+    recognition.interimResults = true;
+    recognition.continuous = false;
+    const base = inputEl.value.trim();
+    recognition.onresult = (e) => {
+      let spoken = "";
+      for (const result of e.results) spoken += result[0].transcript;
+      inputEl.value = (base ? base + " " : "") + spoken.trim();
+      inputEl.dispatchEvent(new Event("input"));
+    };
+    recognition.onend = () => setVoiceState(false);
+    recognition.onerror = () => setVoiceState(false);
+    try {
+      recognition.start();
+      setVoiceState(true);
+    } catch (err) {
+      setVoiceState(false);
+    }
+  });
+
+  // Anruf
+  let callStart = null;
+  let callTimer = null;
+
+  function formatDuration(ms) {
+    const total = Math.floor(ms / 1000);
+    const m = String(Math.floor(total / 60)).padStart(2, "0");
+    const s = String(total % 60).padStart(2, "0");
+    return `${m}:${s}`;
+  }
+
+  function startCall() {
+    callStart = Date.now();
+    callBar.hidden = false;
+    callText.textContent = "Verbunden mit dem Kunden";
+    callTime.textContent = "00:00";
+    callTimer = setInterval(() => {
+      callTime.textContent = formatDuration(Date.now() - callStart);
+    }, 1000);
+    callBtn.classList.add("hangup");
+    callBtn.setAttribute("aria-label", "Anruf beenden");
+    callBtn.title = "Anruf beenden";
+    addMessage("bot", "Anruf angenommen. Gesprächsnotizen können Sie hier im Chat festhalten.");
+  }
+
+  function endCall() {
+    const duration = formatDuration(Date.now() - callStart);
+    clearInterval(callTimer);
+    callTimer = null;
+    callStart = null;
+    callBar.hidden = true;
+    callBtn.classList.remove("hangup");
+    callBtn.setAttribute("aria-label", "Anruf annehmen");
+    callBtn.title = "Anruf annehmen";
+    addMessage("bot", `Anruf beendet nach ${duration}.`);
+  }
+
+  callBtn.addEventListener("click", () => {
+    if (callStart) endCall();
+    else startCall();
+  });
+
+  // Eingabe und Senden
+  function updateSend() {
+    sendBtn.disabled = inputEl.value.trim() === "" && pending.length === 0;
+  }
+
+  inputEl.addEventListener("input", () => {
+    inputEl.style.height = "auto";
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 140) + "px";
+    updateSend();
+  });
+
+  inputEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      formEl.requestSubmit();
+    }
+  });
+
+  formEl.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const text = inputEl.value.trim();
+    if (!text && pending.length === 0) return;
+    const files = pending;
+    pending = [];
+    inputEl.value = "";
+    inputEl.style.height = "auto";
+    renderAttachments();
+    addMessage("user", text, files);
+    respond(text, files);
+  });
+
+  updateProgress();
+  updateSend();
+</script>
+</body>
+</html>
